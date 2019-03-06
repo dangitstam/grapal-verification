@@ -33,18 +33,20 @@
 ;; TODO: All relations are symmetric. A helper function that checks both orders should be implemented.
 
 (define all-authors-relation
-    ;; Make it so all-authors 0 & 1 all-authors paper-data 0, and all-authors 3 & 4 author-data paper-data 1.
     (list
-        (cons (cons (list-ref all-authors 0) (list-ref all-papers 0)) 1)
-        (cons (cons (list-ref all-authors 0) (list-ref all-papers 1)) 0)
-        (cons (cons (list-ref all-authors 1) (list-ref all-papers 0)) 1)
-        (cons (cons (list-ref all-authors 1) (list-ref all-papers 1)) 0)
-        (cons (cons (list-ref all-authors 2) (list-ref all-papers 0)) 0)
-        (cons (cons (list-ref all-authors 2) (list-ref all-papers 1)) 0)
-        (cons (cons (list-ref all-authors 3) (list-ref all-papers 0)) 0)
-        (cons (cons (list-ref all-authors 3) (list-ref all-papers 1)) 1)
-        (cons (cons (list-ref all-authors 4) (list-ref all-papers 0)) 0)
-        (cons (cons (list-ref all-authors 4) (list-ref all-papers 1)) 1)
+        ;; Make it so all-authors 1 & 2 all-authors paper-data 1
+        (cons (list (list-ref all-authors 0) (list-ref all-papers 0)) 1)
+        (cons (list (list-ref all-authors 0) (list-ref all-papers 1)) 0)
+        (cons (list (list-ref all-authors 1) (list-ref all-papers 0)) 1)
+        (cons (list (list-ref all-authors 1) (list-ref all-papers 1)) 0)
+        (cons (list (list-ref all-authors 2) (list-ref all-papers 0)) 0)
+        (cons (list (list-ref all-authors 2) (list-ref all-papers 1)) 0)
+        (cons (list (list-ref all-authors 3) (list-ref all-papers 0)) 0)
+
+        ;; and authors 4 & 5 author-data paper-data 2.
+        (cons (list (list-ref all-authors 3) (list-ref all-papers 1)) 1)
+        (cons (list (list-ref all-authors 4) (list-ref all-papers 0)) 0)
+        (cons (list (list-ref all-authors 4) (list-ref all-papers 1)) 1)
     )     
 )
 

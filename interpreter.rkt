@@ -17,7 +17,7 @@
 ;; TODO: Abstract to a util.rkt file.
 ;; For convenience, reverses a pair.
 (define (reverse-pair pr)
-    (cons (cdr pr) (car pr)))
+    (list (cdr pr) (car pr)))
 
 ;; Given two strings representing variables, establish a dependency.
 ;; All edges in the DSL will result in a dependency of nodes that
@@ -25,8 +25,8 @@
 ;;
 ;; TODO: Will we need to check existence before consing?
 (define (establish-dependence n1 n2)
-    (begin (hash-set! dependencies n1 (cons n2 (hash-ref! dependencies n1 null)))
-           (hash-set! dependencies n2 (cons n1 (hash-ref! dependencies n2 null)))))
+    (begin (hash-set! dependencies n1 (set-add (hash-ref! dependencies n1 (set)) n2))
+           (hash-set! dependencies n2 (set-add (hash-ref! dependencies n2 (set)) n1))))
 
 ;; Given a node, collects all possible nodes that satisfy the node's given
 ;; constraint.
@@ -37,7 +37,7 @@
 ;; of the type specified by the input.
 (define (consume-node node)
     (cond 
-        [author-node? node
+        [(author-node? node)
             (let ([constraint (author-node-constrain node)]
                   [author-nodes    (universe-authors univ)])
                 (cond  ;; Filter via constraints.
@@ -52,7 +52,7 @@
                             (filter (lambda (a) (= v (author-data-id a))) author-nodes))]
                     ;; No constraint specified.
                     [(null? constraint) author-nodes]))]
-        [paper-node? node
+        [(paper-node? node)
             (let ([constraint (paper-node-constrain node)]
                   [paper-nodes    (universe-papers univ)])
                 (cond  ;; Filter via constraints.
@@ -66,7 +66,7 @@
                         (let ([v (id-value constraint)])
                             (filter (lambda (p) (= v (paper-data-id p))) paper-nodes))]
                     [(null? constraint) paper-nodes]))]
-        [entity-node? node
+        [(entity-node? node)
             (let ([constraint (entity-node-constrain node)]
                   [entity-nodes   (universe-entities univ)])
                 (cond  ;; Filter via constraints.
@@ -84,8 +84,8 @@
 ;; TODO: This accepts a node struct; should it instead take two variables and lookup
 ;; the type from them? Should the IR include mappings from variables to their types?
 (define (get-relation n1 n2)
-    (define t1 (hash-ref! types n1))
-    (define t2 (hash-ref! types n2))
+    (define t1 (hash-ref! types n1 #f))
+    (define t2 (hash-ref! types n2 #f))
     (cond 
           ;; Affiliations are between an affiliations and either an author or paper.
           [(or (and (or (equal? author-node? t1) (equal? paper-node? t1)) (equal? affiliation-node? t2))
@@ -114,19 +114,22 @@
 ;; if there exists at least one node n2 in the set of nodes v2 maps to such
 ;; that (n1, n2) -> 1 in the relation, then keep n1 in the set v1 maps to.
 (define (constrain-by-relation v1 v2 relation)
-    (define pairs (cartesian-product (hash-ref! environment v1) (hash-ref! environment v2)))
-    (define new-v1 (set))
-    (define new-v2 (set))
+    (define pairs (cartesian-product (hash-ref! environment v1 null) (hash-ref! environment v2 null)))
+    (define new-v1 null)
+    (define new-v2 null)
     (define (check-pairs ps)
         (if (null? ps)
             (void)
             (begin
-                (let ([pr (car ps)])
+                (let* ([pr (car ps)]
+                       [forward-pair (assoc pr relation)]
+                       [reverse-pair (assoc (reverse-pair pr) relation)])
                     ;; Checks both orders (relations in GrapAL are symmetric).
-                    (if (or (= (cdr (assoc pr relation)) 1)
-                            (= (cdr (assoc (reverse-pair pr) relation)) 1))
-                        (begin (set-add! new-v1 (car pr))
-                               (set-add! new-v2 (cdr pr)))
+                    (if (or (and forward-pair (= (cdr forward-pair) 1))
+                            (and reverse-pair (= (cdr reverse-pair) 1)))
+                        (begin (set! new-v1 (cons (car pr) new-v1))
+                               ;; pr is actually a list of two elements.
+                               (set! new-v2 (cons (car (cdr pr)) new-v1)))
                         (void)))
                 (check-pairs (cdr ps)))))
     (begin
@@ -142,12 +145,14 @@
 ;;
 ;; TODO: How will bounded model checking be introduced here?
 (define (update-dependencies var visited)
-    (define dependencies (set-subtract (hash-ref! environment var (set)) visited))
-    ;; Lists allow for the cartesian product.
-    (define dependencies-as-list (set->list 
-        ;; Don't include nodes that have already been visited.
-        (set-subtract (hash-ref! environment var (set)) visited)))
-    (define update-pairs (cartesian-product (list var) dependencies-as-list))
+    ;; Collect all dependent nodes and exclude ones that have been visited.
+    ;; Operating with sets of strings prevents duplicates.
+    (define unvisited-dependent-nodes
+        (filter (lambda (v) (not (set-member? visited v)))
+                (set->list (hash-ref! dependencies var (set)))))
+    (define update-pairs
+        (cartesian-product (list var) unvisited-dependent-nodes))
+
     (begin
         ;; First, map over all pairs of var and its dependencies
         ;; to update them w.r.t var.
@@ -156,10 +161,12 @@
                 (car vs) (cdr vs) (get-relation (car vs) (cdr vs))))
             update-pairs)
 
-        ;; Next, recursively update all dependencies.
+        ;; Next, recursively the dependencies of var's dependencies.
         ;; All nodes updated in this frame do not need to be visited again.
-        (map (lambda (v) (update-dependencies v (set-add visited dependencies)))
-             dependencies)))
+        (map 
+            (lambda (v)
+                (update-dependencies v (set-add visited (list->set unvisited-dependent-nodes))))
+             unvisited-dependent-nodes)))
 
 ;; Given an edge type, establishes a dependence between the nodes that share
 ;; the edge and initialize any new node in the environment.
@@ -202,8 +209,8 @@
                 ;; smart enough to do this.
                 (begin
                     ;; Map variables to their types for easy lookups of relations later.
-                    (hash-set! a-var author-node?)
-                    (hash-set! p-var paper-node?)
+                    (hash-set! types a-var author-node?)
+                    (hash-set! types p-var paper-node?)
                     (consume-edge-helper a-var p-var a p (relations-authors rel))))]
         [(mentions? edge)
             (let* ([p (mentions-paper edge)]
@@ -212,8 +219,8 @@
                    [e-var (entity-node-variable e)])
                    (begin
                     ;; Map variables to their types for easy lookups of relations later.
-                    (hash-set! p-var paper-node?)
-                    (hash-set! e-var entity-node?)
+                    (hash-set! types p-var paper-node?)
+                    (hash-set! types e-var entity-node?)
                     (consume-edge-helper p-var e-var p e (relations-mentions rel))))]
         
         ;; TODO: Support this and other edges after smoke-testing the above.
@@ -227,15 +234,22 @@
 ))
 
 (define (interpreter edges where ret)
-    (void))
+    (map consume-edge edges)
+    (println environment)
+)
 
 (define (MATCH edges #:WHERE [where null] #:RETURN [ret null])
     (interpreter edges where ret ))
 
-(define test
+; (define test
+;     (MATCH (list
+;         (authors (author "a") (paper "p")) 
+;         (mentions (paper "p") (entity "e" #:constrain (name 1))))
+;         #:RETURN "p"))
+
+(define test2
     (MATCH (list
-        (authors (author "a") (paper "p")) 
-        (mentions (paper "p") (entity "e" #:constrain (name "Relationship Extraction"))))
+        (authors (author "a") (paper "p" #:constrain (title 2))))
         #:RETURN "p"))
 
-(println test)
+(println test2)
