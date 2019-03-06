@@ -129,7 +129,7 @@
                             (and reverse-pair (= (cdr reverse-pair) 1)))
                         (begin (set! new-v1 (cons (car pr) new-v1))
                                ;; pr is actually a list of two elements.
-                               (set! new-v2 (cons (car (cdr pr)) new-v1)))
+                               (set! new-v2 (cons (car (cdr pr)) new-v2)))
                         (void)))
                 (check-pairs (cdr ps)))))
     (begin
@@ -235,7 +235,9 @@
 
 (define (interpreter edges where ret)
     (map consume-edge edges)
-    (println environment)
+
+    ;; Return the specified node.
+    (hash-ref! environment ret null)
 )
 
 (define (MATCH edges #:WHERE [where null] #:RETURN [ret null])
@@ -250,6 +252,6 @@
 (define test2
     (MATCH (list
         (authors (author "a") (paper "p" #:constrain (title 2))))
-        #:RETURN "p"))
+        #:RETURN "a"))
 
 (println test2)
