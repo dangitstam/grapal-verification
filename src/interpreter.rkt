@@ -4,7 +4,7 @@
 (require "language.rkt")
 (require "graph.rkt")
 (require "util.rkt")
-(require "universe-1.rkt")
+(require "../test/universe-1.rkt")
 
 ;; Given two strings representing variables, establish a dependency by
 ;; creating mappings for each string in `dependencies` such that
@@ -55,11 +55,11 @@
 ;;
 ;; If a node has no constraints, returns the set of all nodes in the universe
 ;; of the type specified by the input.
-(define (consume-node node univ)
+(define (consume-node node all-elements)
     (cond 
         [(author-node? node)
             (let ([constraint (author-node-constrain node)]
-                  [author-nodes    (universe-authors univ)])
+                  [author-nodes    (universe-authors all-elements)])
                 (cond  ;; Filter via constraints.
                     [(first? constraint)
                         (let ([v (first-value constraint)])
@@ -74,21 +74,27 @@
                     [(null? constraint) author-nodes]))]
         [(paper-node? node)
             (let ([constraint (paper-node-constrain node)]
-                  [paper-nodes    (universe-papers univ)])
+                  [paper-nodes    (universe-papers all-elements)])
                 (cond  ;; Filter via constraints.
                     [(title? constraint)
                         (let ([v (title-value constraint)])
                             (filter (lambda (p) (= v (paper-data-title p))) paper-nodes))]
-                    [(year? constraint)
-                        (let ([v (year-value constraint)])
+                    [(year-equal-to? constraint)
+                        (let ([v (year-equal-to-value constraint)])
                             (filter (lambda (p) (= v (paper-data-year p))) paper-nodes))]
+                    [(year-less-than? constraint)
+                        (let ([v (year-less-than-value constraint)])
+                            (filter (lambda (p) (< v (paper-data-year p))) paper-nodes))]
+                    [(year-greater-than? constraint)
+                        (let ([v (year-greater-than-value constraint)])
+                            (filter (lambda (p) (> v (paper-data-year p))) paper-nodes))]
                     [(id? constraint)
                         (let ([v (id-value constraint)])
                             (filter (lambda (p) (= v (paper-data-id p))) paper-nodes))]
                     [(null? constraint) paper-nodes]))]
         [(entity-node? node)
             (let ([constraint (entity-node-constrain node)]
-                  [entity-nodes   (universe-entities univ)])
+                  [entity-nodes   (universe-entities all-elements)])
                 (cond  ;; Filter via constraints.
                     [(name? constraint)
                         (let ([v (name-value constraint)])
@@ -136,7 +142,7 @@
 ;; not recursively explore nodes that do not change.
 ;;
 ;; TODO: How will bounded model checking be introduced here?
-(define (update-dependencies var visited environment types dependencies)
+(define (update-dependencies var visited environment types dependencies all-relations)
     ;; Collect all dependent nodes and exclude ones that have been visited.
     ;; Operating with sets of strings prevents duplicates.
     (define unvisited-dependent-nodes
@@ -150,7 +156,9 @@
         ;; to update them w.r.t var.
         (map 
             (lambda (vs)
-                (constrain-by-relation (car vs) (car (cdr vs)) environment (get-relation (car vs) (car (cdr vs)) types rel)))
+                (constrain-by-relation
+                    (car vs) (car (cdr vs)) environment
+                    (get-relation (car vs) (car (cdr vs)) types all-relations)))
             update-pairs)
 
         ;; Next, recursively the dependencies of var's dependencies.
@@ -159,7 +167,7 @@
         (map 
             (lambda (v)
                 (update-dependencies v updated-visted
-                    environment types dependencies))
+                    environment types dependencies all-relations))
              unvisited-dependent-nodes)))
 
 
@@ -167,7 +175,7 @@
 ;; the edge and initialize any new node in the environment.
 ;;
 ;; TODO: can this be polymorphic?
-(define (consume-edge edge environment types dependencies univ)
+(define (consume-edge edge environment types dependencies all-elements all-relations)
     ;; Resolve constraints and map variables appropriately.
     ;; Then, within edges, remove nodes in respective mappings that do not
     ;; exist in the relation specified by the edge.
@@ -178,8 +186,8 @@
         (begin
             (establish-dependence v1 v2 dependencies)
             ;; Resolve constraints that nodes come with.
-            (hash-set! environment v1 (consume-node n1 univ))
-            (hash-set! environment v2 (consume-node n2 univ))
+            (hash-set! environment v1 (consume-node n1 all-elements))
+            (hash-set! environment v2 (consume-node n2 all-elements))
 
             ;; Given two sets, the final constraint is to constraint
             ;; w.r.t the relation.
@@ -187,8 +195,8 @@
 
             ;; Recursively update dependencies without revisiting nodes
             ;; that have been seen.
-            (update-dependencies v1 (set v1 v2) environment types dependencies)
-            (update-dependencies v2 (set v1 v2) environment types dependencies)))
+            (update-dependencies v1 (set v1 v2) environment types dependencies all-relations)
+            (update-dependencies v2 (set v1 v2) environment types dependencies all-relations)))
 
     ;; TODO: if any of the below break, the query was not well-formed.
     ;; Implement custom exceptions to communicate this to the user
@@ -206,7 +214,7 @@
                     ;; Map variables to their types for easy lookups of relations later.
                     (hash-set! types a-var author-node?)
                     (hash-set! types p-var paper-node?)
-                    (consume-edge-helper a-var p-var a p (relations-authors rel))))]
+                    (consume-edge-helper a-var p-var a p (relations-authors all-relations))))]
         [(mentions? edge)
             (let* ([p (mentions-paper edge)]
                    [e (mentions-entity edge)]
@@ -216,46 +224,33 @@
                     ;; Map variables to their types for easy lookups of relations later.
                     (hash-set! types p-var paper-node?)
                     (hash-set! types e-var entity-node?)
-                    (consume-edge-helper p-var e-var p e (relations-mentions rel))))]
-        
-        ;; TODO: Support this and other edges after smoke-testing the above.
-        ; [(cites? edge)
-        ;     (let ([p1 (cites-p1 edge)]
-        ;           [p2 (cites-p2 edge)]
-        ;           [p1-var (paper-node-variable p1)]
-        ;           [p1-var (paper-node-variable p2)])
-        ;         (consume-edge-helper p1-var p2-var p1 p2 (relations-cites rel)))]
-                    
+                    (consume-edge-helper p-var e-var p e (relations-mentions all-relations))))]
+        [(cites? edge)
+            (let* ([p1 (cites-p1 edge)]
+                   [p2 (cites-p2 edge)]
+                   [p1-var (paper-node-variable p1)]
+                   [p2-var (paper-node-variable p2)])
+                (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
 ))
 
-(define (interpreter edges where ret)
-    (define environment (make-hash))   ;; Variable => Candidate Nodes.
-    (define types (make-hash))         ;; Variable => Type
-    (define dependencies (make-hash))  ;; Variable => Dependent Variables.
+(define (make-interpreter all-elements all-relations)
+    (lambda (edges where return-stmt)
+        (define environment (make-hash))   ;; Variable => Candidate Nodes.
+        (define types (make-hash))         ;; Variable => Type
+        (define dependencies (make-hash))  ;; Variable => Dependent Variables.
+    
+        ;; Given every provided edge
+        ;;   i. resolves constraints within nodes.
+        ;;  ii. resolves constraints between the nodes that share the edge.
+        ;; iii. resolves constraints between the nodes that share the edge and all
+        ;;      of their respective dependencies.
+        (map (lambda (edge) (consume-edge edge environment types dependencies all-elements all-relations)) edges)
+    
+        ;; TODO: Handle the where statement.
+    
+        ;; Return the specified node.
+        (hash-ref! environment return-stmt null)))
 
-    ;; Given every provided edge
-    ;;   i. resolves constraints within nodes.
-    ;;  ii. resolves constraints between the nodes that share the edge.
-    ;; iii. resolves constraints between the nodes that share the edge and all
-    ;;      of their respective dependencies.
-    (map (lambda (edge) (consume-edge edge environment types dependencies univ)) edges)
-
-    ;; Return the specified node.
-    (hash-ref! environment ret null)
-)
-
-(define (MATCH edges #:WHERE [where null] #:RETURN [ret null])
-    (interpreter edges where ret))
-
-(define test
-    (MATCH (list
-        (authors (author "a") (paper "p")) 
-        (mentions (paper "p") (entity "e" #:constrain (name 1))))
-        #:RETURN "p"))
-
-; (define test2
-;     (MATCH (list
-;         (authors (author "a") (paper "p" #:constrain (title 1))))
-;         #:RETURN "a"))
-
-(println test)
+(define (make-query-matcher interpreter)
+    (lambda (edges #:WHERE [where null] #:RETURN [return-stmt null])
+        (interpreter edges where return-stmt)))

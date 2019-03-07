@@ -10,12 +10,15 @@
 (struct venue-node       (variable constrain) #:transparent)
 
 ;; Possible constraints.
-(struct first (value) #:transparent)
-(struct last  (value) #:transparent)
-(struct id    (value) #:transparent)
-(struct title (value) #:transparent)
-(struct name  (value) #:transparent)
-(struct year  (value) #:transparent)
+(struct first              (value) #:transparent)
+(struct id                 (value) #:transparent)
+(struct last               (value) #:transparent)
+(struct name               (value) #:transparent)
+(struct title              (value) #:transparent)
+(struct year-equal-to      (value) #:transparent)
+(struct year-less-than     (value) #:transparent)
+(struct year-greater-than  (value) #:transparent)
+
 
 ;; Supported edge types.
 (struct authors  (author paper) #:transparent)
