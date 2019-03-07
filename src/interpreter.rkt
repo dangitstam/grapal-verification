@@ -1,6 +1,5 @@
 #lang rosette
 
-(provide (all-defined-out))
 (require "language.rkt")
 (require "graph.rkt")
 (require "util.rkt")
@@ -250,7 +249,10 @@
     
         ;; Return the specified node.
         (hash-ref! environment return-stmt null)))
+(provide make-interpreter)
+
 
 (define (make-query-matcher interpreter)
     (lambda (edges #:WHERE [where null] #:RETURN [return-stmt null])
         (interpreter edges where return-stmt)))
+(provide make-query-matcher)
