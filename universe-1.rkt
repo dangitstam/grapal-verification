@@ -24,17 +24,17 @@
         (set! xs (cons (entity-data i i) xs)))
     xs)
 
-(define all-authors (set-of-all-authors 5))
+(define all-authors (reverse (set-of-all-authors 5)))
 
-(define all-entities (set-of-all-entities 3))
+(define all-entities (reverse (set-of-all-entities 3)))
 
-(define all-papers (set-of-all-papers 2))
+(define all-papers (reverse (set-of-all-papers 2)))
 
 ;; TODO: All relations are symmetric. A helper function that checks both orders should be implemented.
 
 (define all-authors-relation
     (list
-        ;; Make it so all-authors 1 & 2 all-authors paper-data 1
+        ;; Make it so all-authors 0 & 1 all-authors paper-data 0
         (cons (list (list-ref all-authors 0) (list-ref all-papers 0)) 1)
         (cons (list (list-ref all-authors 0) (list-ref all-papers 1)) 0)
         (cons (list (list-ref all-authors 1) (list-ref all-papers 0)) 1)
@@ -43,7 +43,7 @@
         (cons (list (list-ref all-authors 2) (list-ref all-papers 1)) 0)
         (cons (list (list-ref all-authors 3) (list-ref all-papers 0)) 0)
 
-        ;; and authors 4 & 5 author-data paper-data 2.
+        ;; and authors 3 & 4 author-data paper-data 1.
         (cons (list (list-ref all-authors 3) (list-ref all-papers 1)) 1)
         (cons (list (list-ref all-authors 4) (list-ref all-papers 0)) 0)
         (cons (list (list-ref all-authors 4) (list-ref all-papers 1)) 1)
@@ -51,12 +51,13 @@
 )
 
 (define mentions-relation
-    ;; Make it so paper-data 1 mentions enities 1 and 2, paper-data 2 mentions entity-data 3.
+    ;; Make it so paper-data 0 mentions enities 0 and 1, paper-data 1 mentions entity-data 1.
     ;; TODO: This representation is wrong, it should be a list of tuples with 1 or 0 as the second element.
     (list
-        (cons (list-ref all-papers 0) (list-ref all-entities 0))
-        (cons (list-ref all-papers 0) (list-ref all-entities 1))
-        (cons (list-ref all-papers 1) (list-ref all-entities 2))
+        (cons (list (list-ref all-papers 0) (list-ref all-entities 0)) 1)
+        (cons (list (list-ref all-papers 0) (list-ref all-entities 1)) 1)
+        (cons (list (list-ref all-papers 1) (list-ref all-entities 0)) 0)
+        (cons (list (list-ref all-papers 1) (list-ref all-entities 1)) 1)
     )
 )
 

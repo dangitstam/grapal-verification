@@ -114,10 +114,10 @@
             (begin
                 (let* ([pr (car ps)]
                        [forward-pair (assoc pr relation)]
-                       [reverse-pair (assoc (reverse-pair pr) relation)])
+                       [backward-pair (assoc (reverse-pair pr) relation)])
                     ;; Checks both orders (relations in GrapAL are symmetric).
                     (if (or (and forward-pair (= (cdr forward-pair) 1))
-                            (and reverse-pair (= (cdr reverse-pair) 1)))
+                            (and backward-pair (= (cdr backward-pair) 1)))
                         (begin (set! new-v1 (cons (car pr) new-v1))
                                ;; pr is actually a list of two elements.
                                (set! new-v2 (cons (car (cdr pr)) new-v2)))
@@ -136,7 +136,7 @@
 ;; not recursively explore nodes that do not change.
 ;;
 ;; TODO: How will bounded model checking be introduced here?
-(define (update-dependencies var visited dependencies)
+(define (update-dependencies var visited environment types dependencies)
     ;; Collect all dependent nodes and exclude ones that have been visited.
     ;; Operating with sets of strings prevents duplicates.
     (define unvisited-dependent-nodes
@@ -150,14 +150,16 @@
         ;; to update them w.r.t var.
         (map 
             (lambda (vs)
-                (constrain-by-relation (car vs) (cdr vs) environment (get-relation (car vs) (cdr vs) types rel)))
+                (constrain-by-relation (car vs) (car (cdr vs)) environment (get-relation (car vs) (car (cdr vs)) types rel)))
             update-pairs)
 
         ;; Next, recursively the dependencies of var's dependencies.
         ;; All nodes updated in this frame do not need to be visited again.
+        (define updated-visted (set-union visited (list->set unvisited-dependent-nodes)))
         (map 
             (lambda (v)
-                (update-dependencies v (set-add visited (list->set unvisited-dependent-nodes))))
+                (update-dependencies v updated-visted
+                    environment types dependencies))
              unvisited-dependent-nodes)))
 
 
@@ -165,7 +167,7 @@
 ;; the edge and initialize any new node in the environment.
 ;;
 ;; TODO: can this be polymorphic?
-(define (consume-edge edge environment dependencies types univ)
+(define (consume-edge edge environment types dependencies univ)
     ;; Resolve constraints and map variables appropriately.
     ;; Then, within edges, remove nodes in respective mappings that do not
     ;; exist in the relation specified by the edge.
@@ -185,8 +187,8 @@
 
             ;; Recursively update dependencies without revisiting nodes
             ;; that have been seen.
-            (update-dependencies v1 (set v1 v2) dependencies)
-            (update-dependencies v2 (set v1 v2) dependencies)))
+            (update-dependencies v1 (set v1 v2) environment types dependencies)
+            (update-dependencies v2 (set v1 v2) environment types dependencies)))
 
     ;; TODO: if any of the below break, the query was not well-formed.
     ;; Implement custom exceptions to communicate this to the user
@@ -243,17 +245,17 @@
 )
 
 (define (MATCH edges #:WHERE [where null] #:RETURN [ret null])
-    (interpreter edges where ret ))
+    (interpreter edges where ret))
 
-; (define test
-;     (MATCH (list
-;         (authors (author "a") (paper "p")) 
-;         (mentions (paper "p") (entity "e" #:constrain (name 1))))
-;         #:RETURN "p"))
-
-(define test2
+(define test
     (MATCH (list
-        (authors (author "a") (paper "p" #:constrain (title 1))))
-        #:RETURN "a"))
+        (authors (author "a") (paper "p")) 
+        (mentions (paper "p") (entity "e" #:constrain (name 1))))
+        #:RETURN "p"))
 
-(println test2)
+; (define test2
+;     (MATCH (list
+;         (authors (author "a") (paper "p" #:constrain (title 1))))
+;         #:RETURN "a"))
+
+(println test)

@@ -7,4 +7,4 @@
 
 ;; For convenience, reverses a pair.
 (define (reverse-pair pr)
-    (list (cdr pr) (car pr)))
+    (list (car (cdr pr)) (car pr)))
