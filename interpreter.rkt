@@ -3,30 +3,50 @@
 (provide (all-defined-out))
 (require "language.rkt")
 (require "graph.rkt")
+(require "util.rkt")
 (require "universe-1.rkt")
 
-;; Variable => Type
-(define types (make-hash))
-
-;; Variable => Candidate Nodes.
-(define environment (make-hash))
-
-;; Variable => Dependent Variables.
-(define dependencies (make-hash))
-
-;; TODO: Abstract to a util.rkt file.
-;; For convenience, reverses a pair.
-(define (reverse-pair pr)
-    (list (cdr pr) (car pr)))
-
-;; Given two strings representing variables, establish a dependency.
+;; Given two strings representing variables, establish a dependency by
+;; creating mappings for each string in `dependencies` such that
+;; the values are sets. Each set will contain the other variable.
+;;
 ;; All edges in the DSL will result in a dependency of nodes that
 ;; share an edge.
-;;
-;; TODO: Will we need to check existence before consing?
-(define (establish-dependence n1 n2)
+(define (establish-dependence n1 n2 dependencies)
     (begin (hash-set! dependencies n1 (set-add (hash-ref! dependencies n1 (set)) n2))
            (hash-set! dependencies n2 (set-add (hash-ref! dependencies n2 (set)) n1))))
+
+
+;; Given two nodes, finds the appropriate relation between their types.
+;; Returns null if no such relation exists.
+;;
+;; TODO: This accepts a node struct; should it instead take two variables and lookup
+;; the type from them? Should the IR include mappings from variables to their types?
+(define (get-relation n1 n2 types all-relations)
+    (define t1 (hash-ref! types n1 #f))
+    (define t2 (hash-ref! types n2 #f))
+    (cond 
+          ;; Affiliations are between an affiliations and either an author or paper.
+          [(or (and (or (equal? author-node? t1) (equal? paper-node? t1)) (equal? affiliation-node? t2))
+               (and (equal? affiliation-node? t1) (or (equal? author-node? t2) (equal? paper-node? t2)))) 
+            (relations-affiliated-with all-relations)]
+          ;; Venues are only associated with papers via appears-in.
+          [(or (and (equal? paper-node? t1) (equal? venue-node? t2))
+               (and (equal? venue-node? t1) (equal? paper-node? t2)))
+            (relations-appears-in all-relations)]
+          ;; Only authors can write papers.
+          [(or (and (equal? author-node? t1) (equal? paper-node? t2))
+               (and (equal? paper-node? t1)  (equal? author-node? t2)))
+            (relations-authors all-relations)]
+          ;; Only papers can cite each other.
+          [(and (equal? paper-node? t1) (equal? paper-node? t2))
+            (relations-cites all-relations)]
+          ;; Only papers can mention entities.
+          [(or (and (equal? paper-node? t1) (equal? entity-node? t2))
+               (and (equal? entity-node? t1) (equal? paper-node? t2)))
+            (relations-mentions all-relations)]
+          [#f null]))
+
 
 ;; Given a node, collects all possible nodes that satisfy the node's given
 ;; constraint.
@@ -35,7 +55,7 @@
 ;;
 ;; If a node has no constraints, returns the set of all nodes in the universe
 ;; of the type specified by the input.
-(define (consume-node node)
+(define (consume-node node univ)
     (cond 
         [(author-node? node)
             (let ([constraint (author-node-constrain node)]
@@ -78,42 +98,13 @@
                             (filter (lambda (e) (= v (entity-data-id e))) entity-nodes))]
                     [(null? constraint) entity-nodes]))]))
 
-;; Given two nodes, finds the appropriate relation between their types.
-;; Returns null if no such relation exists.
-;;
-;; TODO: This accepts a node struct; should it instead take two variables and lookup
-;; the type from them? Should the IR include mappings from variables to their types?
-(define (get-relation n1 n2)
-    (define t1 (hash-ref! types n1 #f))
-    (define t2 (hash-ref! types n2 #f))
-    (cond 
-          ;; Affiliations are between an affiliations and either an author or paper.
-          [(or (and (or (equal? author-node? t1) (equal? paper-node? t1)) (equal? affiliation-node? t2))
-               (and (equal? affiliation-node? t1) (or (equal? author-node? t2) (equal? paper-node? t2)))) 
-            (relations-affiliated-with rel)]
-          ;; Venues are only associated with papers via appears-in.
-          [(or (and (equal? paper-node? t1) (equal? venue-node? t2))
-               (and (equal? venue-node? t1) (equal? paper-node? t2)))
-            (relations-appears-in rel)]
-          ;; Only authors can write papers.
-          [(or (and (equal? author-node? t1) (equal? paper-node? t2))
-               (and (equal? paper-node? t1)  (equal? author-node? t2)))
-            (relations-authors rel)]
-          ;; Only papers can cite each other.
-          [(and (equal? paper-node? t1) (equal? paper-node? t2))
-            (relations-cites rel)]
-          ;; Only papers can mention entities.
-          [(or (and (equal? paper-node? t1) (equal? entity-node? t2))
-               (and (equal? entity-node? t1) (equal? paper-node? t2)))
-            (relations-mentions rel)]
-          [#f null]))
 
 ;; Given a pair of variables and a relation, constraint the nodes that the
 ;; variables map to.
 ;; Meaning, for the given relation, for a node n1 in the set v1 maps to,
 ;; if there exists at least one node n2 in the set of nodes v2 maps to such
 ;; that (n1, n2) -> 1 in the relation, then keep n1 in the set v1 maps to.
-(define (constrain-by-relation v1 v2 relation)
+(define (constrain-by-relation v1 v2 environment relation)
     (define pairs (cartesian-product (hash-ref! environment v1 null) (hash-ref! environment v2 null)))
     (define new-v1 null)
     (define new-v2 null)
@@ -137,6 +128,7 @@
         (hash-set! environment v1 new-v1)
         (hash-set! environment v2 new-v2)))
 
+
 ;; Given a node and a set of nodes that were already visited, recursively
 ;; explores and updates all dependencies.
 ;;
@@ -144,7 +136,7 @@
 ;; not recursively explore nodes that do not change.
 ;;
 ;; TODO: How will bounded model checking be introduced here?
-(define (update-dependencies var visited)
+(define (update-dependencies var visited dependencies)
     ;; Collect all dependent nodes and exclude ones that have been visited.
     ;; Operating with sets of strings prevents duplicates.
     (define unvisited-dependent-nodes
@@ -157,8 +149,8 @@
         ;; First, map over all pairs of var and its dependencies
         ;; to update them w.r.t var.
         (map 
-            (lambda (vs) (constrain-by-relation
-                (car vs) (cdr vs) (get-relation (car vs) (cdr vs))))
+            (lambda (vs)
+                (constrain-by-relation (car vs) (cdr vs) environment (get-relation (car vs) (cdr vs) types rel)))
             update-pairs)
 
         ;; Next, recursively the dependencies of var's dependencies.
@@ -168,11 +160,12 @@
                 (update-dependencies v (set-add visited (list->set unvisited-dependent-nodes))))
              unvisited-dependent-nodes)))
 
+
 ;; Given an edge type, establishes a dependence between the nodes that share
 ;; the edge and initialize any new node in the environment.
 ;;
 ;; TODO: can this be polymorphic?
-(define (consume-edge edge)
+(define (consume-edge edge environment dependencies types univ)
     ;; Resolve constraints and map variables appropriately.
     ;; Then, within edges, remove nodes in respective mappings that do not
     ;; exist in the relation specified by the edge.
@@ -181,19 +174,19 @@
     ;; Everything else outside of this helps in implementing a type system.
     (define (consume-edge-helper v1 v2 n1 n2 relation)
         (begin
-            (establish-dependence v1 v2)
+            (establish-dependence v1 v2 dependencies)
             ;; Resolve constraints that nodes come with.
-            (hash-set! environment v1 (consume-node n1))
-            (hash-set! environment v2 (consume-node n2))
+            (hash-set! environment v1 (consume-node n1 univ))
+            (hash-set! environment v2 (consume-node n2 univ))
 
             ;; Given two sets, the final constraint is to constraint
             ;; w.r.t the relation.
-            (constrain-by-relation v1 v2 relation)
+            (constrain-by-relation v1 v2 environment relation)
 
             ;; Recursively update dependencies without revisiting nodes
             ;; that have been seen.
-            (update-dependencies v1 (set v1 v2))
-            (update-dependencies v2 (set v1 v2))))
+            (update-dependencies v1 (set v1 v2) dependencies)
+            (update-dependencies v2 (set v1 v2) dependencies)))
 
     ;; TODO: if any of the below break, the query was not well-formed.
     ;; Implement custom exceptions to communicate this to the user
@@ -234,7 +227,16 @@
 ))
 
 (define (interpreter edges where ret)
-    (map consume-edge edges)
+    (define environment (make-hash))   ;; Variable => Candidate Nodes.
+    (define types (make-hash))         ;; Variable => Type
+    (define dependencies (make-hash))  ;; Variable => Dependent Variables.
+
+    ;; Given every provided edge
+    ;;   i. resolves constraints within nodes.
+    ;;  ii. resolves constraints between the nodes that share the edge.
+    ;; iii. resolves constraints between the nodes that share the edge and all
+    ;;      of their respective dependencies.
+    (map (lambda (edge) (consume-edge edge environment types dependencies univ)) edges)
 
     ;; Return the specified node.
     (hash-ref! environment ret null)
@@ -251,7 +253,7 @@
 
 (define test2
     (MATCH (list
-        (authors (author "a") (paper "p" #:constrain (title 2))))
+        (authors (author "a") (paper "p" #:constrain (title 1))))
         #:RETURN "a"))
 
 (println test2)

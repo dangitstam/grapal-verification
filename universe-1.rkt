@@ -9,19 +9,19 @@
 (define (set-of-all-authors n)
     (define xs null)
     (for ([i n])
-        (set! xs (cons (author-data (- n i) (- n i) (- n i)) xs)))
+        (set! xs (cons (author-data i i i) xs)))
     xs)
 
 (define (set-of-all-papers n)
     (define xs null)
     (for ([i n])
-        (set! xs (cons (paper-data (- n i) (- n i) (- n i)) xs)))
+        (set! xs (cons (paper-data i i i) xs)))
     xs)
 
 (define (set-of-all-entities n)
     (define xs null)
     (for ([i n])
-        (set! xs (cons (entity-data (- n i) (- n i)) xs)))
+        (set! xs (cons (entity-data i i) xs)))
     xs)
 
 (define all-authors (set-of-all-authors 5))
