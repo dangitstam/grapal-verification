@@ -232,6 +232,9 @@
                 (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
 ))
 
+
+;; Wrapper for creating an interpreter that works over the given universe
+;; and relations.
 (define (make-interpreter all-elements all-relations)
     (lambda (edges where return-stmt)
         (define environment (make-hash))   ;; Variable => Candidate Nodes.
@@ -246,12 +249,23 @@
         (map (lambda (edge) (consume-edge edge environment types dependencies all-elements all-relations)) edges)
     
         ;; TODO: Handle the where statement.
+
+        ;; TODO: Limit 1 and other perks
     
-        ;; Return the specified node.
-        (hash-ref! environment return-stmt null)))
+        ;; Return the specified node(s).
+        (cond [(string? return-stmt) (hash-ref! environment return-stmt null)]
+              [(list? return-stmt)
+                (let* 
+                    ([elements null]
+                     [collect-elements (lambda (v) (cons (hash-ref! environment return-stmt null) elements))])
+                    
+                    (begin
+                        (map collect-elements return-stmt)    
+                        (reverse elements)))])))
 (provide make-interpreter)
 
 
+;; Given an interpreter, yields a function capable of fulfilling queries.
 (define (make-query-matcher interpreter)
     (lambda (edges #:WHERE [where null] #:RETURN [return-stmt null])
         (interpreter edges where return-stmt)))
