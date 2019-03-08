@@ -230,6 +230,12 @@
                    [p1-var (paper-node-variable p1)]
                    [p2-var (paper-node-variable p2)])
                 (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
+        [(cites? edge)
+            (let* ([p1 (cites-p1 edge)]
+                   [p2 (cites-p2 edge)]
+                   [p1-var (paper-node-variable p1)]
+                   [p2-var (paper-node-variable p2)])
+                (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
 ))
 
 

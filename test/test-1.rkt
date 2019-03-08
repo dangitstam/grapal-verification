@@ -43,6 +43,7 @@
     (assert (equal? query answer))
     (displayln "test-all-entities-that-have-mentioned ✓"))
 
+(displayln "Single-constraint unit tests ---------------------------------------------------")
 (test-all-authors-that-have-authored-papers)
 (test-all-papers-that-have-mentioned-entities)
 (test-all-entities-that-have-mentioned)

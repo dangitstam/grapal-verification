@@ -49,9 +49,9 @@
 
             ;; Authors 5 and 9 author paper 2, 3
             (cons (list (list-ref all-authors 5) (list-ref all-papers 2)) 1)
-            (cons (list (list-ref all-authors 5) (list-ref all-papers 2)) 1)
+            (cons (list (list-ref all-authors 5) (list-ref all-papers 3)) 1)
             (cons (list (list-ref all-authors 9) (list-ref all-papers 2)) 1)
-            (cons (list (list-ref all-authors 9) (list-ref all-papers 2)) 1)
+            (cons (list (list-ref all-authors 9) (list-ref all-papers 3)) 1)
         )
     )
 
