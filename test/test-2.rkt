@@ -21,5 +21,18 @@
     (assert (equal? query answer))
     (displayln "test-constrain-author-via-constrained-paper ✓"))
 
+(define (test-constrain-paper-via-constrained-author)
+    (define query
+        (MATCH (list
+            (authors (author "a" #:constrain (first 3)) (paper "p")))
+            #:RETURN "p"))
+    (define answer (make-hash))
+    (hash-set! answer "p"
+        (set (list-ref all-papers 1)))
+    (assert (equal? query answer))
+    (displayln "test-constrain-paper-via-constrained-author ✓"))
+
+
 (displayln "Constrain via constrained dependent --------------------------------------------")
 (test-constrain-author-via-constrained-paper)
+(test-constrain-paper-via-constrained-author)

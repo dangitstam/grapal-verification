@@ -101,7 +101,32 @@
                     [(id? constraint)
                         (let ([v (last-value constraint)])
                             (filter (lambda (e) (= v (entity-data-id e))) entity-nodes))]
-                    [(null? constraint) entity-nodes]))]))
+                    [(null? constraint) entity-nodes]))]
+    
+        [(affiliation-node? node)
+            (let ([constraint        (affiliation-node-constrain node)]
+                  [affiliation-nodes (universe-affiliations all-elements)])
+                (cond  ;; Filter via constraints.
+                    [(text? constraint)
+                        (let ([v (text-value constraint)])
+                            (filter (lambda (a) (= v (affiliation-data-text a))) affiliation-nodes))]
+                    [(id? constraint)
+                        (let ([v (last-value constraint)])
+                            (filter (lambda (a) (= v (affiliation-data-id a))) affiliation-nodes))]
+                    [(null? constraint) affiliation-nodes]))]
+
+
+        [(venue-node? node)
+            (let ([constraint        (venue-node-constrain node)]
+                  [venue-nodes (universe-venues all-elements)])
+                (cond  ;; Filter via constraints.
+                    [(text? constraint)
+                        (let ([v (text-value constraint)])
+                            (filter (lambda (w) (= v (venue-data-text w))) venue-nodes))]
+                    [(id? constraint)
+                        (let ([v (last-value constraint)])
+                            (filter (lambda (w) (= v (venue-data-id w))) venue-nodes))]
+                    [(null? constraint) venue-nodes]))]))
 
 
 ;; Given a pair of variables and a relation, constraint the nodes that the
@@ -197,11 +222,28 @@
             (update-dependencies v1 (set v1 v2) environment types dependencies all-relations)
             (update-dependencies v2 (set v1 v2) environment types dependencies all-relations)))
 
-    ;; TODO: if any of the below break, the query was not well-formed.
+    ;; TODO(Tam): if any of the below break, the query was not well-formed.
     ;; Implement custom exceptions to communicate this to the user
     ;; in the future.
     ;; Select the correct relation to constrain with.
     (cond 
+        ;; Single nodes need only be added to the environment.
+        [(author-node? edge)
+            (begin (hash-set! types (author-node-variable edge) author-node?)
+                   (hash-set! environment (author-node-variable edge) (consume-node edge all-elements)))]
+        [(paper-node? edge)
+            (begin (hash-set! types (paper-node-variable edge) author-node?)
+                   (hash-set! environment (paper-node-variable edge) (consume-node edge all-elements)))]
+        [(entity-node? edge)
+            (begin (hash-set! types (entity-node-variable edge) paper-node?)
+                   (hash-set! environment (entity-node-variable edge) (consume-node edge all-elements)))]
+        [(venue-node? edge)
+            (begin (hash-set! types (venue-node-variable edge) venue-node?)
+                   (hash-set! environment (venue-node-variable edge) (consume-node edge all-elements)))]
+        [(affiliation-node? edge)
+            (begin (hash-set! types (affiliation-node-variable edge) affiliation-node?)
+                   (hash-set! environment (affiliation-node-variable edge) (consume-node edge all-elements)))]
+        ;; Edges require establishing a dependency in addition to adding both variables to the environment.
         [(authors? edge)
             (let* ([a (authors-author edge)]
                    [p (authors-paper edge)]
@@ -246,7 +288,7 @@
         (define environment (make-hash))   ;; Variable => Candidate Nodes.
         (define types (make-hash))         ;; Variable => Type
         (define dependencies (make-hash))  ;; Variable => Dependent Variables.
-    
+            
         ;; Given every provided edge
         ;;   i. resolves constraints within nodes.
         ;;  ii. resolves constraints between the nodes that share the edge.

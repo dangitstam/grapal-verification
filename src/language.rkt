@@ -15,6 +15,7 @@
 (struct last               (value) #:transparent)
 (struct name               (value) #:transparent)
 (struct title              (value) #:transparent)
+(struct text               (value) #:transparent)
 (struct year-equal-to      (value) #:transparent)
 (struct year-less-than     (value) #:transparent)
 (struct year-greater-than  (value) #:transparent)
