@@ -3,7 +3,6 @@
 (require "language.rkt")
 (require "graph.rkt")
 (require "util.rkt")
-(require "../test/universe-1.rkt")
 
 ;; Given two strings representing variables, establish a dependency by
 ;; creating mappings for each string in `dependencies` such that

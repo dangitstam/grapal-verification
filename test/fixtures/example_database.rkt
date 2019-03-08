@@ -1,7 +1,7 @@
 #lang rosette
 
 (provide (all-defined-out))
-(require "../src/graph.rkt")
+(require "../../src/graph.rkt")
 
 ;; An example universe containing an instantiated set of nodes and edges
 ;; defined in GrapAL. For simplicity, intergers are used in place of strings.

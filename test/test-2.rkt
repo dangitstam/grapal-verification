@@ -3,7 +3,7 @@
 
 (require "../src/language.rkt")
 (require "../src/interpreter.rkt")
-(require "universe-1.rkt")
+(require "fixtures/example_database.rkt")
 
 (define interpreter (make-interpreter all-elements all-relations))
 (define MATCH (make-query-matcher interpreter))
