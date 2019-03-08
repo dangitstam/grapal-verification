@@ -272,12 +272,23 @@
                    [p1-var (paper-node-variable p1)]
                    [p2-var (paper-node-variable p2)])
                 (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
-        [(cites? edge)
-            (let* ([p1 (cites-p1 edge)]
-                   [p2 (cites-p2 edge)]
-                   [p1-var (paper-node-variable p1)]
-                   [p2-var (paper-node-variable p2)])
-                (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
+        [(affiliated-with? edge)
+            (let* ([e1 (affiliated-with-e1 edge)]
+                   [e2 (affiliated-with-e2 edge)]
+                   [e1-var 
+                        (cond [(author-node? e1) (author-node-variable e1)]
+                              [(paper-node? e1) (paper-node-variable e1)]
+                              [#t (error "Affiliation is only between authors/papers and affilations.")])]
+
+                   ;; Second argument is assumed to be an affiliation (TODO: type checking here?)
+                   [e2-var (affiliation-node-variable e2)])
+                (consume-edge-helper e1-var e2-var e1 e2 (relations-affiliated-with all-relations)))]
+        [(appears-in? edge)
+            (let* ([p (appears-in-paper edge)]
+                   [v (appears-in-venue edge)]
+                   [p-var (paper-node-variable p)]
+                   [v-var (venue-node-variable v)])
+                (consume-edge-helper p-var v-var p v (relations-appears-in all-relations)))]
 ))
 
 

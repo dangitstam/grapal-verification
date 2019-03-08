@@ -78,7 +78,9 @@
             #:RETURN "p"))
     (define answer (make-hash))
     (hash-set! answer "p"
-        (set (list-ref all-papers 0) (list-ref all-papers 1) (list-ref all-papers 3)))
+        (set (list-ref all-papers 0)
+             (list-ref all-papers 1)
+             (list-ref all-papers 3)))
     (assert (equal? query answer))
     (displayln "test-all-papers-that-have-mentioned-entities ✓"))
 
