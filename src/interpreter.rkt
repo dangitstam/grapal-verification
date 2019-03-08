@@ -1,6 +1,5 @@
 #lang rosette
 
-(provide (all-defined-out))
 (require "language.rkt")
 (require "graph.rkt")
 (require "util.rkt")
@@ -233,6 +232,9 @@
                 (consume-edge-helper p1-var p2-var p1 p2 (relations-cites all-relations)))]
 ))
 
+
+;; Wrapper for creating an interpreter that works over the given universe
+;; and relations.
 (define (make-interpreter all-elements all-relations)
     (lambda (edges where return-stmt)
         (define environment (make-hash))   ;; Variable => Candidate Nodes.
@@ -245,12 +247,34 @@
         ;; iii. resolves constraints between the nodes that share the edge and all
         ;;      of their respective dependencies.
         (map (lambda (edge) (consume-edge edge environment types dependencies all-elements all-relations)) edges)
+
+        (define results (make-hash))
     
         ;; TODO: Handle the where statement.
-    
-        ;; Return the specified node.
-        (hash-ref! environment return-stmt null)))
 
+        ;; TODO: Limit 1 and other perks
+    
+        ;; Return the specified node(s).
+        (cond [(string? return-stmt)
+                (hash-set! results return-stmt
+                    ;; Sets are returned for easy equality.
+                    ;; This may have to change when symbolic values are introduced.
+                    (list->set (hash-ref! environment return-stmt null)))]
+              [(list? return-stmt)
+                (let* 
+                    ([elements null]
+                     [collect-elements
+                        (lambda (v)
+                            (hash-set! results return-stmt
+                                (list->set (hash-ref! environment return-stmt null))))])
+                    (map collect-elements return-stmt))])
+        ;; Yield a hash from variable to the elements.
+        results))
+(provide make-interpreter)
+
+
+;; Given an interpreter, yields a function capable of fulfilling queries.
 (define (make-query-matcher interpreter)
     (lambda (edges #:WHERE [where null] #:RETURN [return-stmt null])
         (interpreter edges where return-stmt)))
+(provide make-query-matcher)
