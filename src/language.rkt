@@ -15,15 +15,18 @@
 (struct last               (value) #:transparent)
 (struct name               (value) #:transparent)
 (struct title              (value) #:transparent)
+(struct text               (value) #:transparent)
 (struct year-equal-to      (value) #:transparent)
 (struct year-less-than     (value) #:transparent)
 (struct year-greater-than  (value) #:transparent)
 
 
 ;; Supported edge types.
-(struct authors  (author paper) #:transparent)
-(struct mentions (paper entity) #:transparent)
-(struct cites    (p1 p2)  #:transparent)
+(struct authors         (author paper) #:transparent)
+(struct mentions        (paper entity) #:transparent)
+(struct cites           (p1 p2)        #:transparent)
+(struct affiliated-with (e1 e2)        #:transparent)
+(struct appears-in      (paper venue)        #:transparent)
 
 ;; Racket embedding of GrapAL. This allows a cleaner syntax so that
 ;; the constraint can be optional.
