@@ -247,21 +247,29 @@
         ;; iii. resolves constraints between the nodes that share the edge and all
         ;;      of their respective dependencies.
         (map (lambda (edge) (consume-edge edge environment types dependencies all-elements all-relations)) edges)
+
+        (define results (make-hash))
     
         ;; TODO: Handle the where statement.
 
         ;; TODO: Limit 1 and other perks
     
         ;; Return the specified node(s).
-        (cond [(string? return-stmt) (hash-ref! environment return-stmt null)]
+        (cond [(string? return-stmt)
+                (hash-set! results return-stmt
+                    ;; Sets are returned for easy equality.
+                    ;; This may have to change when symbolic values are introduced.
+                    (list->set (hash-ref! environment return-stmt null)))]
               [(list? return-stmt)
                 (let* 
                     ([elements null]
-                     [collect-elements (lambda (v) (cons (hash-ref! environment return-stmt null) elements))])
-                    
-                    (begin
-                        (map collect-elements return-stmt)    
-                        (reverse elements)))])))
+                     [collect-elements
+                        (lambda (v)
+                            (hash-set! results return-stmt
+                                (list->set (hash-ref! environment return-stmt null))))])
+                    (map collect-elements return-stmt))])
+        ;; Yield a hash from variable to the elements.
+        results))
 (provide make-interpreter)
 
 
