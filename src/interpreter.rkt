@@ -165,30 +165,43 @@
 ;; if there exists at least one node n2 in the set of nodes v2 maps to such
 ;; that (n1, n2) -> 1 in the relation, then keep n1 in the set v1 maps to.
 (define (constrain-by-relation v1 v2 environment relation)
-    (define pairs (cartesian-product (hash-ref! environment v1 null) (hash-ref! environment v2 null)))
-    (define new-v1 null)
-    (define new-v2 null)
-    (define (check-pairs ps)
-        (if (null? ps)
-            (void)
-            (begin
-                (let* ([pr (car ps)]
-                       [forward-pair (assoc pr relation)]
-                       [backward-pair (assoc (reverse-pair pr) relation)])
-                    ;; Checks both orders (relations in GrapAL are symmetric).
-                    (if (or (and forward-pair (= (cdr forward-pair) 1))
-                            (and backward-pair (= (cdr backward-pair) 1)))
-                        (begin 
-                               (set! new-v1 (cons (car pr) new-v1))
+    (define v1-lookup (assoc v1 environment))
+    (define v2-lookup (assoc v2 environment))
+    (define pairs
+        (cartesian-product
+            (if v1-lookup (car (cdr v1-lookup)) null)
+            (if v2-lookup (car (cdr v2-lookup)) null)))
 
-                               ;; pr is actually a list of two elements.
-                               (set! new-v2 (cons (car (cdr pr)) new-v2)))
-                        (void)))
-                (check-pairs (cdr ps)))))
+    ;; Make this functional
+    (define (check-pairs ps new-v1-values new-v2-values)
+        (if (null? ps)
+            (cons new-v1-values new-v2-values)
+            (let* ([pr (car ps)]
+                   [forward-pair (assoc pr relation)]
+                   [backward-pair (assoc (reverse-pair pr) relation)])
+                ;; Checks both orders (relations in GrapAL are symmetric).
+                (if (or (and forward-pair (= (cdr forward-pair) 1))
+                        (and backward-pair (= (cdr backward-pair) 1)))
+                    ;; If the relation is present, include the respective values.
+                    (check-pairs (cdr ps) 
+                        ;; Prevent duplicates from being added.
+                        (if (member (car pr) new-v1-values)
+                            new-v1-values
+                            (cons (car pr) new-v1-values))
+                        (if (member (car (cdr pr)) new-v2-values)
+                            new-v2-values
+                            (cons (car (cdr pr)) new-v2-values)))
+
+                    ;; Otherwise exclude them.
+                    (check-pairs (cdr ps) new-v1-values new-v2-values)))))
     (begin
-        (check-pairs pairs)
-        (hash-set! environment v1 new-v1)
-        (hash-set! environment v2 new-v2)))
+        (define updated-values (check-pairs pairs null null))
+        (define updated-v1-values (car updated-values))
+        (define updated-v2-values (cdr updated-values))
+
+        ;; Overwrite existing values.
+        (cons (list v1 updated-v1-values)
+              (cons (list v2 updated-v2-values) environment))))
 
 
 ;; Given a node and a set of nodes that were already visited, recursively
@@ -201,38 +214,52 @@
 (define (update-dependencies var visited environment types dependencies all-relations)
     ;; Collect all dependent nodes and exclude ones that have been visited.
     ;; Operating with sets of strings prevents duplicates.
-    ; (define unvisited-dependent-nodes
-    ;     (filter (lambda (v) (not (set-member? visited v)))
-    ;             (set->list (hash-ref! dependencies var (set)))))
     (define dependencies-of-var
         (let ([lookup (assoc var dependencies)])
             ;; Lookup is of the form (list var (list vars))
             (if lookup (car (cdr lookup)) null)))
 
     (define unvisited-dependent-nodes
-        (filter (lambda (v) (not (set-member? visited v))) dependencies-of-var))
-    (define update-pairs
+        (filter (lambda (v) (not (member v visited))) dependencies-of-var))
+
+    (define pairs-to-update
         (cartesian-product (list var) unvisited-dependent-nodes))
 
-    (begin
-        ;; First, map over all pairs of var and its dependencies
-        ;; to update them w.r.t var.
-        (map 
-            (lambda (vs)
-                (constrain-by-relation
-                    (car vs) (car (cdr vs)) environment
-                    (get-relation (car vs) (car (cdr vs)) types all-relations)))
-            update-pairs)
+    ;; Helper function to overwrite the environment by constraining on
+    ;; all pairs.
+    (define (constrain-all-pairs-by-relation pairs environment)
+        (if (null? pairs)
+            environment
+            ;; Each pair is a two-element list. Use car x2 to get the first element out,
+            ;; and car cdr car to get the second.
+            (let* ([pr (car pairs)]
+                   [v1 (car pr)]
+                   [v2 (car (cdr pr))]
+                   [current-relation (get-relation v1 v2 types all-relations)]
+                   [new-environment (constrain-by-relation v1 v2 environment current-relation)])
+                (constrain-all-pairs-by-relation (cdr pairs) new-environment))))
 
-        ;; Next, recursively update the dependencies of var's dependencies.
-        ;; All nodes updated in this frame do not need to be visited again.
-        (define updated-visited (set-union visited (list->set unvisited-dependent-nodes)))
+    (define environment-with-constrained-pairs
+        (constrain-all-pairs-by-relation pairs-to-update environment))
 
-        (map 
-            (lambda (v)
-                (update-dependencies v updated-visited
-                    environment types dependencies all-relations))
-             unvisited-dependent-nodes)))
+    (define all-visited-nodes (append visited unvisited-dependent-nodes))
+
+    (define (update-all-dependencies nodes-to-visit visited environment types dependencies all-relations)
+        (if (null? nodes-to-visit)
+            environment
+            (let* ([v (car nodes-to-visit)]
+                   [new-environment (update-dependencies v visited environment types dependencies all-relations)])
+                (update-all-dependencies
+                    (cdr nodes-to-visit)
+                    visited
+                    new-environment
+                    types dependencies all-relations))))
+
+    (update-all-dependencies
+        unvisited-dependent-nodes
+        all-visited-nodes
+        environment-with-constrained-pairs
+        types dependencies all-relations))
 
 
 ;; Given an edge type, establishes a dependence between the nodes that share
@@ -260,20 +287,28 @@
         (begin
             ; (establish-dependence v1 v2 dependencies)
             ;; Resolve constraints that nodes come with.
-            (hash-set! environment v1 (consume-node n1 all-elements))
-            (hash-set! environment v2 (consume-node n2 all-elements))
+            (define environment-with-v1-v2
+                (cons (list v1 (consume-node n1 all-elements))
+                      (cons (list v2 (consume-node n2 all-elements))
+                            environment)))
 
             ;; Given two sets, the final constraint is to constraint
             ;; w.r.t the relation.
-            (constrain-by-relation v1 v2 environment relation)
+            (define environment-after-relation-constraints
+                (constrain-by-relation v1 v2 environment-with-v1-v2 relation))
 
             ;; Recursively update dependencies without revisiting nodes
             ;; that have been seen.
-            (update-dependencies v1 (set v1 v2) environment types latest-dependencies all-relations)
-            (update-dependencies v2 (set v1 v2) environment types latest-dependencies all-relations))
+            (define environment-after-updating-v1-dependencies  ;; TODO: issue here.
+                (update-dependencies v1 (list v1 v2) environment-after-relation-constraints
+                                     types latest-dependencies all-relations))
+
+            (define environment-after-updating-v2-dependencies
+                (update-dependencies v2 (list v1 v2) environment-after-updating-v1-dependencies
+                                     types latest-dependencies all-relations))
             
-            (list environment types latest-dependencies)
-        )
+            (list environment-after-updating-v2-dependencies types latest-dependencies)
+        ))
 
     ;; TODO(Tam): if any of the below break, the query was not well-formed.
     ;; Implement custom exceptions to communicate this to the user
@@ -282,30 +317,30 @@
     (cond 
         ;; TODO: Support single-node queries.
         [(author-node? edge)
-            (begin (hash-set! environment (author-node-variable edge) (consume-node edge all-elements))
-                (list
-                    (cons (cons (author-node-variable edge) author-node?) types)
-                    dependencies))]
+            (list     ;; `list` needed to prevent variable from being cons'ed onto the value.
+                (cons (list (author-node-variable edge) (consume-node edge all-elements)) environment)
+                (cons (cons (author-node-variable edge) author-node?) types)
+                dependencies)]
         [(paper-node? edge)
-            (begin (hash-set! environment (paper-node-variable edge) (consume-node edge all-elements))
-                (list
-                    (cons (cons (paper-node-variable edge) paper-node?) types)
-                    dependencies))]
+            (list
+                (cons (list (paper-node-variable edge) (consume-node edge all-elements)) environment)
+                (cons (cons (paper-node-variable edge) paper-node?) types)
+                dependencies)]
         [(entity-node? edge)
-            (begin (hash-set! environment (entity-node-variable edge) (consume-node edge all-elements))
-                (list
-                    (cons (cons (entity-node-variable edge) entity-node?) types)
-                    dependencies))]
+            (list
+                (cons (list (entity-node-variable edge) (consume-node edge all-elements)) environment)
+                (cons (cons (entity-node-variable edge) entity-node?) types)
+                dependencies)]
         [(affiliation-node? edge)
-            (begin (hash-set! environment (affiliation-node-variable edge) (consume-node edge all-elements))
-                (list
-                    (cons (cons (affiliation-node-variable edge) affiliation-node?) types)
-                    dependencies))]
+            (list
+                (cons (list (affiliation-node-variable edge) (consume-node edge all-elements)) environment)
+                (cons (cons (affiliation-node-variable edge) affiliation-node?) types)
+                dependencies)]
         [(venue-node? edge)
-            (begin (hash-set! environment (venue-node-variable edge) (consume-node edge all-elements))
-                (list
-                    (cons (cons (venue-node-variable edge) venue-node?) types)
-                    dependencies))]
+            (list
+                (cons (list (venue-node-variable edge) (consume-node edge all-elements)) environment)
+                (cons (cons (venue-node-variable edge) venue-node?) types)
+                dependencies)]
         ;; Edges require establishing a dependency in addition to adding both variables to the environment.
         [(authors? edge)
             (let* ([a (authors-author edge)]
@@ -366,55 +401,39 @@
 )
 
 (define (consume-edges edges state all-elements all-relations)
-
     (if (null? edges)
         state
         (consume-edges (cdr edges)
             (consume-edge (car edges) state all-elements all-relations)
-            all-elements all-relations)
-    )
-
-)
+            all-elements all-relations)))
 
 ;; Wrapper for creating an interpreter that works over the given universe
 ;; and relations.
 (define (make-interpreter all-elements all-relations)
-    (lambda (edges where return-stmt)
-        (define environment (make-hash))   ;; Variable => Candidate Nodes.
-        (define types null)                ;; Variable => Type
-        (define dependencies null)         ;; Variable => Dependent Variables.
-            
+    (lambda (edges where return-stmt)            
         ;; Given every provided edge
         ;;   i. resolves constraints within nodes.
         ;;  ii. resolves constraints between the nodes that share the edge.
         ;; iii. resolves constraints between the nodes that share the edge and all
         ;;      of their respective dependencies.
         (define final-execution-state
-            (consume-edges edges (list environment types dependencies) all-elements all-relations))
-        ;; (map (lambda (edge) (consume-edge edge environment types dependencies all-elements all-relations)) edges)
+            (consume-edges edges (list null null null) all-elements all-relations))
 
-        (define results (make-hash))
-    
+        (define environment (list-ref final-execution-state 0))  ;; Variable => Candidate Nodes.
+        (define types (list-ref final-execution-state 1))  ;; Variable => Type
+        (define dependencies (list-ref final-execution-state 2))  ;; Variable => Dependent Variables.
+
+        (define results null)
+
         ;; TODO: Handle the where statement.
 
         ;; TODO: Limit 1 and other perks
     
         ;; Return the specified node(s).
-        (cond [(string? return-stmt)
-                (hash-set! results return-stmt
-                    ;; Sets are returned for easy equality.
-                    ;; This may have to change when symbolic values are introduced.
-                    (list->set (hash-ref! environment return-stmt null)))]
+        (cond [(string? return-stmt) (cons (car (cdr (assoc return-stmt environment))) results)]
               [(list? return-stmt)
-                (let* 
-                    ([elements null]
-                     [collect-elements
-                        (lambda (v)
-                            (hash-set! results return-stmt
-                                (list->set (hash-ref! environment return-stmt null))))])
-                    (map collect-elements return-stmt))])
-        ;; Yield a hash from variable to the elements.
-        results))
+                (let* ([collect-elements (lambda (v) (car (cdr (assoc v environment))))])
+                    (map collect-elements return-stmt))])))
 (provide make-interpreter)
 
 
