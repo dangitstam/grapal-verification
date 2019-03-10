@@ -4,15 +4,6 @@
 (require "graph.rkt")
 (require "util.rkt")
 
-;; TODOs
-;;    i. No more hash maps, use association lists instead
-;;   ii. No more mutation, pass arguments in a functional style.
-;;      * One at a time (start with environment)
-;;
-;;  iii. No more hash map return values, do lists of lists.
-;;   iv. For now, solve by picking what should be included in the relations
-;;       (boolean switches)
-;;   vi. No sorting, anywhere. Potentially may need to define custom equality.
 
 ;; Given two strings representing variables, establish a dependency by
 ;; creating mappings in an association list. Elements are tuples of
