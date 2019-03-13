@@ -29,3 +29,6 @@ effect as restricting to papers 3, 4, and 5.
 
 (println cite-equivalent-1)
 (println cite-equivalent-2)
+
+(println (list->set (flatten cite-equivalent-1)))
+(println (list->set (flatten cite-equivalent-2)))

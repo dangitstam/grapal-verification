@@ -1,5 +1,7 @@
 #lang rosette
 
+(require racket/pretty)
+
 (require "language.rkt")
 (require "graph.rkt")
 (require "util.rkt")
@@ -17,6 +19,13 @@
     (define v1-dependencies (assoc v1 dependencies))
     (define v2-dependencies (assoc v2 dependencies))
 
+    ; (println "start")
+    ; (println v1)
+    ; (println v2)
+
+    ; (println v1-dependencies)
+    ; (println v2-dependencies)
+
     (define updated-v1-entry
         (list v1 (if v1-dependencies
                     ;; The dependences are the second element of the pair.
@@ -25,8 +34,11 @@
                     (list v2))))
     (define updated-v2-entry
         (list v2 (if v2-dependencies
-                    (cons v1 (cdr v2-dependencies))
+                    (cons v1 (car (cdr v2-dependencies)))
                     (list v1))))
+
+    ; (println "UPDATED V2 ENTRY")
+    ; (println updated-v2-entry)
 
     ;; Construct new list with cons, dead values are okay.
     (cons updated-v1-entry (cons updated-v2-entry dependencies)))
@@ -158,10 +170,24 @@
 (define (constrain-by-relation v1 v2 environment relation)
     (define v1-lookup (assoc v1 environment))
     (define v2-lookup (assoc v2 environment))
+
+    (println "BEGIN CONSTRAIN-BY-RELATION ---------------------------------------------------------------")
+    (println v1-lookup)
+    (println v2-lookup)
+
+    (println "BEFORE PAIRS ---------------------------------------------------------------")
+    
+    (println (car (cdr v1-lookup)))
+
     (define pairs
-        (cartesian-product
+        (cartesian-product  ;; Carteian product with symbolic values will not work.....
+                            ;; Another indirect mapping may be necessary....
             (if v1-lookup (car (cdr v1-lookup)) null)
             (if v2-lookup (car (cdr v2-lookup)) null)))
+
+    (println "pairs ---------------------------------------------------------------")
+
+    (println pairs)
 
     ;; Make this functional
     (define (check-pairs ps new-v1-values new-v2-values)
@@ -172,7 +198,7 @@
                    [backward-pair (assoc (reverse-pair pr) relation)])
                 ;; Checks both orders (relations in GrapAL are symmetric).
                 (if (or (and forward-pair (cdr forward-pair))
-                        (and backward-pair (cdr backward-pair)))
+                        (and backward-pair (cdr backward-pair)))    ;; TODO: Maybe get rid of the if, and store the boolean instead? then have 
                     ;; If the relation is present, include the respective values.
                     (check-pairs (cdr ps) 
                         ;; Prevent duplicates from being added.
@@ -205,34 +231,45 @@
 (define (update-dependencies var visited environment types dependencies all-relations)
     ;; Collect all dependent nodes and exclude ones that have been visited.
     ;; Operating with sets of strings prevents duplicates.
+    (println "BEGIN UPDATE-DEPENDENCIES")
     (define dependencies-of-var
         (let ([lookup (assoc var dependencies)])
             ;; Lookup is of the form (list var (list vars))
             (if lookup (car (cdr lookup)) null)))
 
+
+    (println "BEGIN UNVISITED-DEPENDENTS")
     (define unvisited-dependent-nodes
         (filter (lambda (v) (not (member v visited))) dependencies-of-var))
 
+    (println "BEGIN PAIRS-TO-UPDATE")
     (define pairs-to-update
         (cartesian-product (list var) unvisited-dependent-nodes))
 
     ;; Helper function to overwrite the environment by constraining on
     ;; all pairs.
     (define (constrain-all-pairs-by-relation pairs environment)
+        (println pairs)
         (if (null? pairs)
-            environment
+            (begin (println environment) environment)
             ;; Each pair is a two-element list. Use car x2 to get the first element out,
             ;; and car cdr car to get the second.
             (let* ([pr (car pairs)]
                    [v1 (car pr)]
-                   [v2 (car (cdr pr))]
+                   [v2 (begin (println "V2") (car (cdr pr)))]
                    [current-relation (get-relation v1 v2 types all-relations)]
-                   [new-environment (constrain-by-relation v1 v2 environment current-relation)])
-                (constrain-all-pairs-by-relation (cdr pairs) new-environment))))
+                   [new-environment (begin (println current-relation) (constrain-by-relation v1 v2 environment current-relation))])
+                (begin
+                    (println "CONSTRAIN-PRs-RELATION-BODY")
+                    (constrain-all-pairs-by-relation (cdr pairs) new-environment)))
+                
+                ))
 
+    (println "BEGIN ENV-WITH-CONSTRAINED-PAIRS")
     (define environment-with-constrained-pairs
         (constrain-all-pairs-by-relation pairs-to-update environment))
 
+    (println "BEGIN ALL-VISITED-NODES")
     (define all-visited-nodes (append visited unvisited-dependent-nodes))
 
     (define (update-all-dependencies nodes-to-visit visited environment types dependencies all-relations)
@@ -246,6 +283,7 @@
                     new-environment
                     types dependencies all-relations))))
 
+    (println "BEGIN UPDATE-ALL-DEPENDENCIES")
     (update-all-dependencies
         unvisited-dependent-nodes
         all-visited-nodes
@@ -266,11 +304,18 @@
     (define types (list-ref state 1))
     (define dependencies (list-ref state 2))
 
+    (println "CONSUME-EDGE")
+    (println edge)
+
     ;; Some parts of this are generalizable, we just need the right relation.
     ;; Everything else outside of this helps in implementing a type system.
     (define (consume-edge-helper v1 v2 n1 n2 types dependencies relation)
         ; (define constrained-n1 (consume-node n1 all-elements))
         ; (define constrained-n2 (consume-node n2 all-elements))
+
+        (println "CONSUME-EDGE-HELPER")
+        (println v1)
+        (println v2)
 
         ;; Dependencies updated so that v1 and v2 depend on each other.
         (define latest-dependencies (establish-dependence v1 v2 dependencies))
@@ -282,22 +327,25 @@
                 (cons (list v1 (consume-node n1 all-elements))
                       (cons (list v2 (consume-node n2 all-elements))
                             environment)))
-
+            (println "1!")
             ;; Given two sets, the final constraint is to constraint
             ;; w.r.t the relation.
             (define environment-after-relation-constraints
                 (constrain-by-relation v1 v2 environment-with-v1-v2 relation))
 
+            (println "2!")
             ;; Recursively update dependencies without revisiting nodes
             ;; that have been seen.
             (define environment-after-updating-v1-dependencies  ;; TODO: issue here.
                 (update-dependencies v1 (list v1 v2) environment-after-relation-constraints
                                      types latest-dependencies all-relations))
 
+            (println "3!")
             (define environment-after-updating-v2-dependencies
                 (update-dependencies v2 (list v1 v2) environment-after-updating-v1-dependencies
                                      types latest-dependencies all-relations))
-            
+
+            (println "4!")
             (list environment-after-updating-v2-dependencies types latest-dependencies)
         ))
 
@@ -391,13 +439,6 @@
     ;; TODO: The others will need to be returned as well.
 )
 
-(define (consume-edges edges state all-elements all-relations)
-    (if (null? edges)
-        state
-        (consume-edges (cdr edges)
-            (consume-edge (car edges) state all-elements all-relations)
-            all-elements all-relations)))
-
 ;; Wrapper for creating an interpreter that works over the given universe
 ;; and relations.
 (define (make-interpreter all-elements all-relations)
@@ -406,9 +447,20 @@
         ;;   i. resolves constraints within nodes.
         ;;  ii. resolves constraints between the nodes that share the edge.
         ;; iii. resolves constraints between the nodes that share the edge and all
-        ;;      of their respective dependencies.
+        ;;      of their respective dependencies. 
+        (println "NEW EXECUTION ===============================================================")
+        (define (consume-edges edges state all-elements all-relations)
+            (if (null? edges)
+                state
+                (begin (println (car edges))
+                (consume-edges (cdr edges)
+                    (consume-edge (car edges) state all-elements all-relations)
+                    all-elements all-relations))))
+
         (define final-execution-state
             (consume-edges edges (list null null null) all-elements all-relations))
+
+        (println "FINISHED FINAL EXECUTION!")
 
         (define environment (list-ref final-execution-state 0))  ;; Variable => Candidate Nodes.
         (define types (list-ref final-execution-state 1))  ;; Variable => Type
@@ -416,15 +468,23 @@
 
         (define results null)
 
+        ; (pretty-print environment)
+
         ;; TODO: Handle the where statement.
 
         ;; TODO: Limit 1 and other perks
     
         ;; Return the specified node(s).
-        (cond [(string? return-stmt) (cons (car (cdr (assoc return-stmt environment))) results)]
-              [(list? return-stmt)
-                (let* ([collect-elements (lambda (v) (car (cdr (assoc v environment))))])
-                    (map collect-elements return-stmt))])))
+        ; (cond [(string? return-stmt) (cons (car (cdr (assoc return-stmt environment))) results)]
+        ;       [(list? return-stmt)
+        ;         (let* ([collect-elements (lambda (v) (car (cdr (assoc v environment))))])
+        ;             (map collect-elements return-stmt))])
+        (println (car (cdr (assoc return-stmt environment))))
+        (println "-----------------------------------------")
+         (car (cdr (assoc return-stmt environment)))
+                    
+                    
+                    ))
 (provide make-interpreter)
 
 
