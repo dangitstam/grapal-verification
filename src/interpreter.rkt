@@ -104,16 +104,16 @@
                             (filter (lambda (p) (= v (paper-data-title p))) paper-nodes))]
                     [(year-equal-to? constraint)
                         (let ([v (year-equal-to-value constraint)])
-                            (filter (lambda (p) (= v (paper-data-year p))) paper-nodes))]
+                            (filter (lambda (p) (= (paper-data-year p) v)) paper-nodes))]
                     [(year-less-than? constraint)
                         (let ([v (year-less-than-value constraint)])
-                            (filter (lambda (p) (< v (paper-data-year p))) paper-nodes))]
+                            (filter (lambda (p) (< (paper-data-year p) v)) paper-nodes))]
                     [(year-greater-than? constraint)
                         (let ([v (year-greater-than-value constraint)])
-                            (filter (lambda (p) (> v (paper-data-year p))) paper-nodes))]
+                            (filter (lambda (p) (> (paper-data-year p) v)) paper-nodes))]
                     [(id? constraint)
                         (let ([v (id-value constraint)])
-                            (filter (lambda (p) (= v (paper-data-id p))) paper-nodes))]
+                            (filter (lambda (p) (= (paper-data-id p) v)) paper-nodes))]
                     [(null? constraint) paper-nodes]))]
         [(entity-node? node)
             (let ([constraint (entity-node-constrain node)]
@@ -171,8 +171,8 @@
                    [forward-pair (assoc pr relation)]
                    [backward-pair (assoc (reverse-pair pr) relation)])
                 ;; Checks both orders (relations in GrapAL are symmetric).
-                (if (or (and forward-pair (= (cdr forward-pair) 1))
-                        (and backward-pair (= (cdr backward-pair) 1)))
+                (if (or (and forward-pair (cdr forward-pair))
+                        (and backward-pair (cdr backward-pair)))
                     ;; If the relation is present, include the respective values.
                     (check-pairs (cdr ps) 
                         ;; Prevent duplicates from being added.

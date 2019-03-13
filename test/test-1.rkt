@@ -4,7 +4,7 @@
 (require "../src/language.rkt")
 (require "../src/interpreter.rkt")
 (require "fixtures/example_database.rkt")
-(require "util.rkt")
+(require "../common/util.rkt")
 
 (define interpreter (make-interpreter all-elements all-relations))
 (define MATCH (make-query-matcher interpreter))
