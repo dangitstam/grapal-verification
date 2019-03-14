@@ -50,6 +50,7 @@
 ;   (displayln "The Appears-In Relation ------------------------------------------")
 ; (pretty-print
 ;   (nth-places 1 (relations-appears-in all-relations)))
+
 (define (demo-1)
   (verify (assert (equal?
     (MATCH (list
@@ -62,7 +63,21 @@
       (authors (author "a2") (paper "p2"))
       (authors (author "a3") (paper "p3"))
       (affiliated-with (author "a3") (affiliation "aff1"))
-      ; (affiliated-with (author "a2") (affiliation "aff1"))
+      (cites (paper "p2") (paper "p1")))
+      #:RETURN "a1")))))
+
+(define (demo-1-2)
+  (verify (assert (equal?
+    (MATCH (list
+      (authors (author "a1") (paper "p1"))
+      (cites (paper "p2") (paper "p1")))
+      #:RETURN "a1")
+
+    (MATCH (list
+      (authors (author "a1") (paper "p1"))
+      (authors (author "a2") (paper "p2"))
+      (authors (author "a3") (paper "p3"))
+      (affiliated-with (author "a2") (affiliation "aff1"))
       (cites (paper "p2") (paper "p1")))
       #:RETURN "a1")))))
 
@@ -89,34 +104,16 @@
       #:RETURN "a1"))))))
 
 
-(define (demo-4)
-  (verify (assert (equal?
-    ; (MATCH (list
-    ;   (affiliated-with (author "a1") (affiliation "aff1"))
-    ;   (authors (author "a1") (paper "p1"))
-    ;   (mentions (paper "p1") (entity #:constrain (name 0))))
-    ;   #:RETURN "aff1")
-
-    (MATCH (list
-      (affiliated-with (author "a1") (affiliation "aff1"))
-      (mentions (paper "p1") (entity #:constrain (name 4))))
-      #:RETURN "aff1")
-
-    (MATCH (list
-      (affiliated-with (author "a1") (affiliation "aff1"))
-      (mentions (paper "p1") (entity "e" #:constrain (name 4))))
-      #:RETURN "aff1")))))
-
 ; ;; TODO: paper affiliation vs author?
 
 (displayln "Demo 1 ----------------------------------------------------------")
-(display-positive-switches (demo-1))
+(demo-1)
+
+(displayln "Demo 1.2 ----------------------------------------------------------")
+(demo-1-2)
 
 (displayln "Demo 2 ----------------------------------------------------------")
-(display-positive-switches (demo-2))
+(demo-2)
 
 (displayln "Demo 3 ----------------------------------------------------------")
-(display-positive-switches (demo-3))
-
-(displayln "Demo 4 ----------------------------------------------------------")
-(display-positive-switches (demo-4))
+(demo-3)

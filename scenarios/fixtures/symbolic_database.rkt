@@ -45,7 +45,7 @@
         relation))
 
 (define all-authors
-    (make-n-authors 10))
+    (make-n-authors 4))
 
 (define all-papers
     (list (paper-data 0 1975 3)
@@ -53,14 +53,13 @@
           (paper-data 2 2018 5)))
 
 (define all-entities
-    (make-n-entities 5))
+    (make-n-entities 3))
 
 (define all-venues
-    (make-n-venues 4))
+    (make-n-venues 2))
 
 (define all-affiliations
-    (make-n-affiliations 3))
-
+    (make-n-affiliations 2))
 
 (define (authors-relation)
     (make-symbolic-relation-from-pairs (cartesian-product all-authors all-papers)))
