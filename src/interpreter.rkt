@@ -1,5 +1,7 @@
 #lang rosette
 
+(require racket/pretty)
+
 (require "language.rkt")
 (require "graph.rkt")
 (require "util.rkt")
@@ -25,7 +27,7 @@
                     (list v2))))
     (define updated-v2-entry
         (list v2 (if v2-dependencies
-                    (cons v1 (cdr v2-dependencies))
+                    (cons v1 (car (cdr v2-dependencies)))
                     (list v1))))
 
     ;; Construct new list with cons, dead values are okay.
@@ -71,14 +73,10 @@
           [#f null]))
 
 
-;; Given a node, collects all possible nodes that satisfy the node's given
-;; constraint.
-;; E.g. a node may be an author node that restricts to all authors with a
-;; particular first name.
-;;
-;; If a node has no constraints, returns the set of all nodes in the universe
-;; of the type specified by the input.
+;; Remember to deal with null constraints
 (define (consume-node node all-elements)
+    ;; A simple lambda that yields true on any input.
+    (define true-factory (lambda (x) #t))
     (cond 
         [(author-node? node)
             (let ([constraint (author-node-constrain node)]
@@ -86,68 +84,73 @@
                 (cond  ;; Filter via constraints.
                     [(first? constraint)
                         (let ([v (first-value constraint)])
-                            (filter (lambda (a) (= v (author-data-first a))) author-nodes))]
+                            (map cons author-nodes (map (lambda (a) (= v (author-data-first a))) author-nodes)))]
                     [(last? constraint)
                         (let ([v (last-value constraint)])
-                            (filter (lambda (a) (= v (author-data-last a))) author-nodes))]
+                            (map cons author-nodes (map (lambda (a) (= v (author-data-last a))) author-nodes)))]
                     [(id? constraint)
                         (let ([v (id-value constraint)])
-                            (filter (lambda (a) (= v (author-data-id a))) author-nodes))]
+                            (map cons author-nodes (map (lambda (a) (= v (author-data-id a))) author-nodes)))]
                     ;; No constraint specified.
-                    [(null? constraint) author-nodes]))]
+                    [(null? constraint)
+                        (map cons author-nodes (build-list (length author-nodes) true-factory))]))]
         [(paper-node? node)
             (let ([constraint (paper-node-constrain node)]
                   [paper-nodes    (universe-papers all-elements)])
                 (cond  ;; Filter via constraints.
                     [(title? constraint)
                         (let ([v (title-value constraint)])
-                            (filter (lambda (p) (= v (paper-data-title p))) paper-nodes))]
+                            (map cons paper-nodes (map (lambda (p) (= v (paper-data-title p))) paper-nodes)))]
                     [(year-equal-to? constraint)
                         (let ([v (year-equal-to-value constraint)])
-                            (filter (lambda (p) (= (paper-data-year p) v)) paper-nodes))]
+                            (map cons paper-nodes (map (lambda (p) (= (paper-data-year p) v)) paper-nodes)))]
                     [(year-less-than? constraint)
                         (let ([v (year-less-than-value constraint)])
-                            (filter (lambda (p) (< (paper-data-year p) v)) paper-nodes))]
+                            (map cons paper-nodes (map (lambda (p) (< (paper-data-year p) v)) paper-nodes)))]
                     [(year-greater-than? constraint)
                         (let ([v (year-greater-than-value constraint)])
-                            (filter (lambda (p) (> (paper-data-year p) v)) paper-nodes))]
+                            (map cons paper-nodes (map (lambda (p) (> (paper-data-year p) v)) paper-nodes)))]
                     [(id? constraint)
                         (let ([v (id-value constraint)])
-                            (filter (lambda (p) (= (paper-data-id p) v)) paper-nodes))]
-                    [(null? constraint) paper-nodes]))]
+                            (map cons paper-nodes (map (lambda (p) (= (paper-data-id p) v)) paper-nodes)))]
+                    [(null? constraint)
+                        (map cons paper-nodes (build-list (length paper-nodes) true-factory))]))]
         [(entity-node? node)
             (let ([constraint (entity-node-constrain node)]
                   [entity-nodes   (universe-entities all-elements)])
                 (cond  ;; Filter via constraints.
                     [(name? constraint)
                         (let ([v (name-value constraint)])
-                            (filter (lambda (e) (= v (entity-data-name e))) entity-nodes))]
+                            (map cons entity-nodes (map (lambda (e) (= v (entity-data-name e))) entity-nodes)))]
                     [(id? constraint)
                         (let ([v (last-value constraint)])
-                            (filter (lambda (e) (= v (entity-data-id e))) entity-nodes))]
-                    [(null? constraint) entity-nodes]))]
+                            (map cons entity-nodes (map (lambda (e) (= v (entity-data-id e))) entity-nodes)))]
+                    [(null? constraint)
+                        (map cons entity-nodes (build-list (length entity-nodes) true-factory))]))]
         [(affiliation-node? node)
             (let ([constraint        (affiliation-node-constrain node)]
                   [affiliation-nodes (universe-affiliations all-elements)])
                 (cond  ;; Filter via constraints.
                     [(text? constraint)
                         (let ([v (text-value constraint)])
-                            (filter (lambda (a) (= v (affiliation-data-text a))) affiliation-nodes))]
+                            (map cons affiliation-nodes (map (lambda (a) (= v (affiliation-data-text a))) affiliation-nodes)))]
                     [(id? constraint)
                         (let ([v (last-value constraint)])
-                            (filter (lambda (a) (= v (affiliation-data-id a))) affiliation-nodes))]
-                    [(null? constraint) affiliation-nodes]))]
+                            (map cons affiliation-nodes (map (lambda (a) (= v (affiliation-data-id a))) affiliation-nodes)))]
+                    [(null? constraint)
+                        (map cons affiliation-nodes (build-list (length affiliation-nodes) true-factory))]))]
         [(venue-node? node)
             (let ([constraint        (venue-node-constrain node)]
                   [venue-nodes (universe-venues all-elements)])
                 (cond  ;; Filter via constraints.
                     [(text? constraint)
                         (let ([v (text-value constraint)])
-                            (filter (lambda (w) (= v (venue-data-text w))) venue-nodes))]
+                            (map cons venue-nodes (map (lambda (w) (= v (venue-data-text w))) venue-nodes)))]
                     [(id? constraint)
                         (let ([v (last-value constraint)])
-                            (filter (lambda (w) (= v (venue-data-id w))) venue-nodes))]
-                    [(null? constraint) venue-nodes]))]))
+                            (map cons venue-nodes (map (lambda (w) (= v (venue-data-id w))) venue-nodes)))]
+                    [(null? constraint)
+                        (map cons venue-nodes (build-list (length venue-nodes) true-factory))]))]))
 
 
 ;; Given a pair of variables and a relation, constraint the nodes that the
@@ -156,43 +159,48 @@
 ;; if there exists at least one node n2 in the set of nodes v2 maps to such
 ;; that (n1, n2) -> 1 in the relation, then keep n1 in the set v1 maps to.
 (define (constrain-by-relation v1 v2 environment relation)
+    (define (sweep-through-relation datum others relation)
+        ;; Fold through the relevant pairs in a relation, accumulating booleans with \/.
+        ;; This is then /\'ed with the entry for v.
+        ;; Relations are assumed to be symmetric. Without loss of generality, check
+        ;; the first element of every pair.
+        (foldl
+            (lambda (x acc)
+                (or acc 
+                    ;; This needs to include a lookup
+                    (let* ([other (car (cdr (car x)))]
+                           [other-boolean (cdr (assoc other others))]
+                           [relation-existence (cdr x)])
+                        (and relation-existence other-boolean))))
+            #f
+            (filter (lambda (pr) (equal? datum (car (car pr)))) relation)))
+
+    (define (accumulate-membership-disjunctions values others relation)
+        ;; Build a new association list with the aggregate relation boolean disjunctions
+        ;; /\'ed onto whatever each value_i had previously.    
+        (if (null? values)
+            null
+            (let* ([pr (car values)]
+                   [datum (car pr)]
+                   [aggregate-boolean (cdr pr)]
+                   [next-aggregate-boolean
+                    (and aggregate-boolean (sweep-through-relation datum others relation))])
+                (cons 
+                    (cons datum next-aggregate-boolean)
+                    (accumulate-membership-disjunctions (cdr values) others relation)))))
+
     (define v1-lookup (assoc v1 environment))
     (define v2-lookup (assoc v2 environment))
-    (define pairs
-        (cartesian-product
-            (if v1-lookup (car (cdr v1-lookup)) null)
-            (if v2-lookup (car (cdr v2-lookup)) null)))
 
-    ;; Make this functional
-    (define (check-pairs ps new-v1-values new-v2-values)
-        (if (null? ps)
-            (cons new-v1-values new-v2-values)
-            (let* ([pr (car ps)]
-                   [forward-pair (assoc pr relation)]
-                   [backward-pair (assoc (reverse-pair pr) relation)])
-                ;; Checks both orders (relations in GrapAL are symmetric).
-                (if (or (and forward-pair (cdr forward-pair))
-                        (and backward-pair (cdr backward-pair)))
-                    ;; If the relation is present, include the respective values.
-                    (check-pairs (cdr ps) 
-                        ;; Prevent duplicates from being added.
-                        (if (member (car pr) new-v1-values)
-                            new-v1-values
-                            (cons (car pr) new-v1-values))
-                        (if (member (car (cdr pr)) new-v2-values)
-                            new-v2-values
-                            (cons (car (cdr pr)) new-v2-values)))
+    (define updated-v1-values
+        (accumulate-membership-disjunctions (car (cdr v1-lookup)) (car (cdr v2-lookup)) relation))
 
-                    ;; Otherwise exclude them.
-                    (check-pairs (cdr ps) new-v1-values new-v2-values)))))
-    (begin
-        (define updated-values (check-pairs pairs null null))
-        (define updated-v1-values (car updated-values))
-        (define updated-v2-values (cdr updated-values))
+    (define updated-v2-values
+        (accumulate-membership-disjunctions (car (cdr v2-lookup)) (car (cdr v1-lookup)) relation))
 
-        ;; Overwrite existing values.
-        (cons (list v1 updated-v1-values)
-              (cons (list v2 updated-v2-values) environment))))
+    ;; Overwrite existing values.
+    (cons (list v1 updated-v1-values)
+          (cons (list v2 updated-v2-values) environment)))
 
 
 ;; Given a node and a set of nodes that were already visited, recursively
@@ -414,16 +422,16 @@
         (define types (list-ref final-execution-state 1))  ;; Variable => Type
         (define dependencies (list-ref final-execution-state 2))  ;; Variable => Dependent Variables.
 
-        (define results null)
-
         ;; TODO: Handle the where statement.
 
         ;; TODO: Limit 1 and other perks
+        (define (filter-return-values var environment)
+            (map car (filter (lambda (x) (cdr x)) (car (cdr (assoc var environment))))))
     
         ;; Return the specified node(s).
-        (cond [(string? return-stmt) (cons (car (cdr (assoc return-stmt environment))) results)]
+        (cond [(string? return-stmt) (list (filter-return-values return-stmt environment))]
               [(list? return-stmt)
-                (let* ([collect-elements (lambda (v) (car (cdr (assoc v environment))))])
+                (let* ([collect-elements (lambda (v) (filter-return-values v environment))])
                     (map collect-elements return-stmt))])))
 (provide make-interpreter)
 

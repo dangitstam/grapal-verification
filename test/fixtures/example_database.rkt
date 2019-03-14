@@ -31,16 +31,29 @@
         (lambda (x)
             (affiliation-data x (+ 1 x)))))
 
-(define (complete-pairs pairs relation)
-    (begin
-        (map (lambda (pr)
-            (if (not (assoc (car pairs) relation))
-                (set! relation (cons (cons pr #f) relation))
-                (void)))
-            pairs)
+(define (make-symmetric relation)
+    (define (make-symmetric-helper relation result)
+        (if (null? relation)
+            result
+            (let* ([pr (car relation)]
+                   [value (cdr pr)]
+                   [forward-pr (car pr)]
+                   [backward-pr (list (list-ref forward-pr 1) (list-ref forward-pr 0))]
+                   [forward (cons forward-pr value)]
+                   [backward (cons backward-pr value)])
+                (make-symmetric-helper (cdr relation) (cons backward (cons forward result))))))
+    (make-symmetric-helper relation null))
 
-        ;; Yield the relation.
-        relation))
+(define (complete-pairs pairs relation)
+    (if (null? pairs)
+        (make-symmetric relation)
+        (let* ([pr (car pairs)]
+               [lookup (assoc pr relation)])
+            (if lookup
+                (complete-pairs (cdr pairs) relation)
+                (complete-pairs (cdr pairs) (cons (cons pr #f) relation))))))
+
+
 
 (define all-authors
     (make-n-authors 10))
