@@ -43,7 +43,7 @@ As described above, properly instantiating an `interpreter` and `MATCH` function
 (define interpreter (make-interpreter all-elements all-relations))
 (define MATCH (make-query-matcher interpreter))
 
-(define
+(define query
     (MATCH (list
       (authors (author "a1") 
                (paper "p1" #:constrain (year-greater-than 1997))))
