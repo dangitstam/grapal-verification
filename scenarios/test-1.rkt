@@ -3,7 +3,7 @@
 
 (require "../src/language.rkt")
 (require "../src/interpreter.rkt")
-(require "fixtures/example_database.rkt")
+(require "fixtures/symbolic_database.rkt")
 (require "../common/util.rkt")
 
 (define interpreter (make-interpreter all-elements all-relations))
@@ -54,41 +54,9 @@
     (assert (queries-equal? query answer))
     (displayln "test-all-venues ✓"))
 
-(define (test-all-authors-that-have-authored-papers)
-    (define query
-        (MATCH (list
-            (authors (author "a") (paper "p")))
-            #:RETURN (list "a")))
-    (define answer 
-        (list (list (list-ref all-authors 0) (list-ref all-authors 1)
-                    (list-ref all-authors 3) (list-ref all-authors 4)
-                    (list-ref all-authors 5) (list-ref all-authors 9))))
-    (assert (queries-equal? query answer))
-    (displayln "test-all-authors-that-have-authored-papers ✓"))
 
-(define (test-all-papers-that-have-mentioned-entities)
-    (define query
-        (MATCH (list
-            (mentions (paper "p") (entity "e")))
-            #:RETURN "p"))
-    (define answer
-        (list (list (list-ref all-papers 0)
-                    (list-ref all-papers 1)
-                    (list-ref all-papers 3))))
-    (assert (queries-equal? query answer))
-    (displayln "test-all-papers-that-have-mentioned-entities ✓"))
+(define ())
 
-(define (test-all-entities-that-have-mentioned)
-    (define query
-        (MATCH (list
-            (mentions (paper "p") (entity "e")))
-            #:RETURN "e"))
-    (define answer
-        (list (list (list-ref all-entities 0)
-                    (list-ref all-entities 1)
-                    (list-ref all-entities 4))))
-    (assert (queries-equal? query answer))
-    (displayln "test-all-entities-that-have-mentioned ✓"))
 
 (displayln "Single-constraint unit tests ---------------------------------------------------")
 (test-all-authors)
@@ -96,6 +64,4 @@
 (test-all-entities)
 (test-all-affiliations)
 (test-all-venues)
-(test-all-authors-that-have-authored-papers)
-(test-all-papers-that-have-mentioned-entities)
-(test-all-entities-that-have-mentioned)
+
