@@ -394,10 +394,7 @@
                 (consume-edge-helper p-var v-var p v
                     (cons (cons p-var paper-node?) 
                           (cons (cons v-var venue-node?) types))
-                    dependencies (relations-appears-in all-relations)))])
-
-    ;; TODO: The others will need to be returned as well.
-)
+                    dependencies (relations-appears-in all-relations)))]))
 
 (define (consume-edges edges state all-elements all-relations)
     (if (null? edges)
@@ -409,7 +406,7 @@
 ;; Wrapper for creating an interpreter that works over the given universe
 ;; and relations.
 (define (make-interpreter all-elements all-relations)
-    (lambda (edges where return-stmt)            
+    (lambda (edges where return-stmt)
         ;; Given every provided edge
         ;;   i. resolves constraints within nodes.
         ;;  ii. resolves constraints between the nodes that share the edge.
